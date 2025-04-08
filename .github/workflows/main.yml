@@ -1,0 +1,76 @@
+name: Build and Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: final-python-app
+  IMAGE_TAG: latest
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+  ECS_CLUSTER: final-python-app 
+  ECS_SERVICE: python-app-2 
+  ECS_TASK_DEFINITION: final-python-app-td
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        run: |
+          aws ecr get-login-password --region $AWS_REGION | \
+          docker login --username AWS --password-stdin $ECR_REGISTRY
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+
+      - name: Update ECS Task Definition with New Image
+        run: |
+          # Get the latest ECS Task Definition ARN
+          TASK_DEF_ARN=$(aws ecs describe-task-definitions --family-prefix $ECS_TASK_DEFINITION --max-items 1 --query 'taskDefinitionArns[0]' --output text)
+          
+          # Register a new task definition with the updated image
+          NEW_TASK_DEF=$(aws ecs register-task-definition \
+            --family $ECS_TASK_DEFINITION \
+            --container-definitions "$(jq --arg IMAGE_URI "${ECR_REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}" \
+            '.containerDefinitions[0].image = $IMAGE_URI' <(aws ecs describe-task-definitions --task-definition $TASK_DEF_ARN --query "taskDefinition.containerDefinitions[0]" --output json))")
+          
+          echo "New Task Definition: $NEW_TASK_DEF"
+
+      - name: Update ECS Service to Use New Task Definition
+        run: |
+          # Get the latest revision of the ECS Task Definition
+          NEW_TASK_DEF_REVISION=$(echo $NEW_TASK_DEF | jq -r '.taskDefinition.revision')
+          
+          # Update ECS service with the new task definition revision
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --task-definition $ECS_TASK_DEFINITION:$NEW_TASK_DEF_REVISION
+          
+          echo "ECS Service updated with new task definition revision: $NEW_TASK_DEF_REVISION"
