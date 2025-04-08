@@ -13,8 +13,8 @@ env:
   ECR_REPOSITORY: final-python-app
   IMAGE_TAG: latest
   ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
-  ECS_CLUSTER: final-python-app 
-  ECS_SERVICE: python-app-2 
+  ECS_CLUSTER: final-python-app
+  ECS_SERVICE: python-app-2
   ECS_TASK_DEFINITION: final-python-app-td
 
 jobs:
@@ -59,7 +59,7 @@ jobs:
           NEW_TASK_DEF=$(aws ecs register-task-definition \
             --family $ECS_TASK_DEFINITION \
             --container-definitions "$(jq --arg IMAGE_URI "${ECR_REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA}" \
-            '.containerDefinitions[0].image = $IMAGE_URI' <(aws ecs describe-task-definitions --task-definition $TASK_DEF_ARN --query "taskDefinition.containerDefinitions[0]" --output json))")
+            '.containerDefinitions[0].image = $IMAGE_URI' <(aws ecs describe-task-definition --task-definition $TASK_DEF_ARN --query "taskDefinition.containerDefinitions[0]" --output json))")
           
           echo "New Task Definition: $NEW_TASK_DEF"
 
