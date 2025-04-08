@@ -50,11 +50,19 @@ jobs:
             ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
             ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
 
+      - name: Get Latest ECS Task Definition ARN
+        run: |
+          # Get the latest revision of the ECS Task Definition
+          TASK_DEF_ARN=$(aws ecs describe-task-definitions \
+            --family-prefix $ECS_TASK_DEFINITION \
+            --max-items 1 \
+            --query 'taskDefinitionArns[0]' \
+            --output text)
+
+          echo "Latest Task Definition ARN: $TASK_DEF_ARN"
+        
       - name: Update ECS Task Definition with New Image
         run: |
-          # Get the latest ECS Task Definition ARN
-          TASK_DEF_ARN=$(aws ecs describe-task-definition --family-prefix $ECS_TASK_DEFINITION --max-items 1 --query 'taskDefinitionArns[0]' --output text)
-          
           # Register a new task definition with the updated image
           NEW_TASK_DEF=$(aws ecs register-task-definition \
             --family $ECS_TASK_DEFINITION \
