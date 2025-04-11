@@ -1,0 +1,44 @@
+name: Build and Deploy Backend
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: final-python-app
+  IMAGE_TAG: latest
+  ECR_REGISTRY: public.ecr.aws/w8n1f6l0
+  ECS_CLUSTER: final-python-app
+  ECS_SERVICE: python-app-2
+  ECS_TASK_DEFINITION: final-python-app-td
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    environment: AWS
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to Amazon ECR
+        run: |
+          
+          aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/w8n1f6l0
+
+      - name: Build and Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ github.sha }}
+            ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
