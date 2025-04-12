@@ -1,0 +1,8 @@
+Create service Account and Add Artifact Registry Administrator permissions: 
+git clone https://github.com/nilayupadhyay17/final-python-app.git
+cd final-python-app/
+gcloud auth configure-docker
+docker push us-east1-docker.pkg.dev/project-name/repo-name/final-python-app:latest
+docker build -t us-east1-docker.pkg.dev/project-name/repo-name/final-python-app:latest .
+
+
